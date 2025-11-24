@@ -1,67 +1,76 @@
-name: Data Preprocessing Pipeline
+name: Data Preprocessing - Climate Change Agriculture
 
 on:
   push:
     branches: [ main, master ]
     paths:
-      - 'WineQT_raw/**'
+      - 'climate_change_raw.csv'
       - 'preprocessing/automate_Zidan-Mubarak.py'
-      - '.github/workflows/preprocessing.yml'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  preprocess-data:
+  preprocessing:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pandas numpy scikit-learn matplotlib seaborn
-        
-    - name: Display Python and package versions
-      run: |
-        python --version
-        pip list
-        
-    - name: Run preprocessing script
-      run: |
-        cd preprocessing
-        python automate_Zidan-Mubarak.py ../WineQT_raw/WineQT.csv WineQT_preprocessing.csv
-        
-    - name: Verify output file
-      run: |
-        if [ -f "preprocessing/WineQT_preprocessing.csv" ]; then
-          echo "✓ Preprocessing successful!"
-          echo "File size: $(du -h preprocessing/WineQT_preprocessing.csv | cut -f1)"
-          echo "Number of lines: $(wc -l < preprocessing/WineQT_preprocessing.csv)"
-        else
-          echo "✗ Error: Output file not found!"
-          exit 1
-        fi
-        
-    - name: Upload preprocessed data as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: preprocessed-wine-data
-        path: preprocessing/WineQT_preprocessing.csv
-        retention-days: 30
-        
-    - name: Commit and push preprocessed data
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add preprocessing/WineQT_preprocessing.csv || true
-        git diff --staged --quiet || git commit -m "🤖 Auto-update: Preprocessed data [skip ci]"
-        git push || echo "No changes to push"
-      continue-on-error: true
+      # 2. Setup Python
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas==2.2.3 numpy==2.1.3 scikit-learn==1.5.2
+      
+      # 4. Run preprocessing script
+      - name: Run preprocessing
+        run: |
+          cd preprocessing
+          python automate_Zidan-Mubarak.py
+      
+      # 5. Verify output file
+      - name: Verify preprocessed data
+        run: |
+          if [ -f "preprocessing/climate_change_preprocessing.csv" ]; then
+            echo "✓ Preprocessed file created successfully"
+            ls -lh preprocessing/climate_change_preprocessing.csv
+            
+            # Show file info
+            python << 'PYEOF'
+          import pandas as pd
+          df = pd.read_csv('preprocessing/climate_change_preprocessing.csv')
+          print(f"\n📊 Preprocessed Dataset Info:")
+          print(f"  Shape: {df.shape}")
+          print(f"  Columns: {list(df.columns)}")
+          print(f"  Memory: {df.memory_usage(deep=True).sum() / 1024:.2f} KB")
+          PYEOF
+          else
+            echo "✗ Preprocessed file not found!"
+            exit 1
+          fi
+      
+      # 6. Upload preprocessed data as artifact
+      - name: Upload preprocessed data
+        uses: actions/upload-artifact@v4
+        with:
+          name: climate-change-preprocessed-data
+          path: preprocessing/climate_change_preprocessing.csv
+          retention-days: 30
+      
+      # 7. Commit and push preprocessed data (optional)
+      - name: Commit preprocessed data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add preprocessing/climate_change_preprocessing.csv || true
+          git commit -m "Auto-update: preprocessed data [skip ci]" || true
+          git push || true

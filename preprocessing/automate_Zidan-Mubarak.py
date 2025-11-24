@@ -1,309 +1,373 @@
 """
-Automated Wine Quality Data Preprocessing
+Climate Change Impact on Agriculture - Data Preprocessing Automation
 Author: Zidan Mubarak
-Description: Script untuk melakukan preprocessing otomatis pada Wine Quality Dataset
+Description: Automated preprocessing pipeline for climate change agriculture dataset
+Target: Advanced (4 pts) - Kriteria 1
 """
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-import os
-import sys
+import warnings
+warnings.filterwarnings('ignore')
 
-
-def load_data(file_path):
+class ClimateAgriculturePreprocessor:
     """
-    Load dataset dari file CSV
+    Automated preprocessing pipeline for Climate Change Agriculture dataset
     
-    Parameters:
-    -----------
-    file_path : str
-        Path ke file CSV
+    Features:
+    - Data loading and validation
+    - Missing value handling
+    - Outlier detection and treatment
+    - Feature engineering
+    - Encoding categorical variables
+    - Feature scaling
+    - Data splitting
+    """
+    
+    def __init__(self, filepath):
+        """Initialize preprocessor with data file path"""
+        self.filepath = filepath
+        self.df = None
+        self.df_processed = None
+        self.label_encoders = {}
+        self.scaler = StandardScaler()
         
-    Returns:
-    --------
-    pd.DataFrame
-        DataFrame yang berisi data
-    """
-    try:
-        df = pd.read_csv(file_path)
-        print(f"✓ Data berhasil dimuat dari {file_path}")
-        print(f"  Shape: {df.shape}")
-        return df
-    except FileNotFoundError:
-        print(f"✗ Error: File {file_path} tidak ditemukan!")
-        sys.exit(1)
-    except Exception as e:
-        print(f"✗ Error saat memuat data: {str(e)}")
-        sys.exit(1)
-
-
-def remove_duplicates(df):
-    """
-    Menghapus data duplikat
-    
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        DataFrame input
+    def load_data(self):
+        """Load dataset from CSV file"""
+        print("=" * 70)
+        print("STEP 1: LOADING DATA")
+        print("=" * 70)
         
-    Returns:
-    --------
-    pd.DataFrame
-        DataFrame tanpa duplikat
-    """
-    initial_shape = df.shape[0]
-    df_clean = df.drop_duplicates()
-    removed = initial_shape - df_clean.shape[0]
-    
-    print(f"\n✓ Duplikat dihapus:")
-    print(f"  Sebelum: {initial_shape} baris")
-    print(f"  Sesudah: {df_clean.shape[0]} baris")
-    print(f"  Dihapus: {removed} baris")
-    
-    return df_clean
-
-
-def handle_outliers(df, method='cap'):
-    """
-    Menangani outliers menggunakan IQR method
-    
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        DataFrame input
-    method : str
-        Method untuk handle outliers ('cap' atau 'remove')
+        self.df = pd.read_csv(self.filepath)
+        print(f"✓ Data loaded successfully")
+        print(f"  Shape: {self.df.shape}")
+        print(f"  Columns: {list(self.df.columns)}")
+        print()
         
-    Returns:
-    --------
-    pd.DataFrame
-        DataFrame setelah outliers ditangani
-    """
-    df_processed = df.copy()
-    numeric_cols = df_processed.select_dtypes(include=[np.number]).columns.tolist()
+        return self
     
-    # Exclude Id and quality columns
-    cols_to_process = [col for col in numeric_cols if col not in ['Id', 'quality']]
-    
-    print(f"\n✓ Menangani outliers dengan method: {method}")
-    
-    for col in cols_to_process:
-        Q1 = df_processed[col].quantile(0.25)
-        Q3 = df_processed[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
+    def explore_data(self):
+        """Explore dataset characteristics"""
+        print("=" * 70)
+        print("STEP 2: DATA EXPLORATION")
+        print("=" * 70)
         
-        if method == 'cap':
-            # Capping outliers
-            df_processed[col] = df_processed[col].clip(lower=lower_bound, upper=upper_bound)
-        elif method == 'remove':
-            # Remove outliers
-            df_processed = df_processed[
-                (df_processed[col] >= lower_bound) & 
-                (df_processed[col] <= upper_bound)
-            ]
-    
-    print(f"  Shape setelah handle outliers: {df_processed.shape}")
-    
-    return df_processed
-
-
-def feature_engineering(df):
-    """
-    Melakukan feature engineering
-    
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        DataFrame input
+        print("\n📊 Dataset Info:")
+        print(f"  Total rows: {len(self.df)}")
+        print(f"  Total columns: {len(self.df.columns)}")
         
-    Returns:
-    --------
-    pd.DataFrame
-        DataFrame setelah feature engineering
-    """
-    df_processed = df.copy()
-    
-    print(f"\n✓ Feature Engineering:")
-    
-    # Drop Id column if exists
-    if 'Id' in df_processed.columns:
-        df_processed = df_processed.drop('Id', axis=1)
-        print(f"  - Kolom 'Id' dihapus")
-    
-    print(f"  Jumlah fitur: {df_processed.shape[1]}")
-    
-    return df_processed
-
-
-def scale_features(df, target_col='quality'):
-    """
-    Melakukan feature scaling menggunakan StandardScaler
-    
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        DataFrame input
-    target_col : str
-        Nama kolom target
+        print("\n📋 Column Data Types:")
+        for col, dtype in self.df.dtypes.items():
+            print(f"  {col}: {dtype}")
         
-    Returns:
-    --------
-    tuple
-        (X_scaled_df, y, scaler)
-    """
-    print(f"\n✓ Feature Scaling:")
-    
-    # Separate features and target
-    X = df.drop(target_col, axis=1)
-    y = df[target_col]
-    
-    # Apply StandardScaler
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
-    
-    print(f"  - Method: StandardScaler")
-    print(f"  - Fitur yang di-scale: {len(X.columns)}")
-    
-    return X_scaled_df, y, scaler
-
-
-def split_data(X, y, test_size=0.2, random_state=42):
-    """
-    Split data menjadi training dan testing set
-    
-    Parameters:
-    -----------
-    X : pd.DataFrame
-        Features
-    y : pd.Series
-        Target
-    test_size : float
-        Proporsi data testing
-    random_state : int
-        Random seed
+        print("\n🔍 Missing Values:")
+        missing = self.df.isnull().sum()
+        if missing.sum() == 0:
+            print("  ✓ No missing values found")
+        else:
+            print(missing[missing > 0])
         
-    Returns:
-    --------
-    tuple
-        (X_train, X_test, y_train, y_test)
-    """
-    print(f"\n✓ Train-Test Split:")
-    
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state, stratify=y
-    )
-    
-    print(f"  - Training set: {X_train.shape[0]} samples ({(1-test_size)*100:.0f}%)")
-    print(f"  - Testing set: {X_test.shape[0]} samples ({test_size*100:.0f}%)")
-    
-    return X_train, X_test, y_train, y_test
-
-
-def save_processed_data(X, y, output_path):
-    """
-    Menyimpan data yang sudah diproses
-    
-    Parameters:
-    -----------
-    X : pd.DataFrame
-        Features yang sudah diproses
-    y : pd.Series
-        Target variable
-    output_path : str
-        Path untuk menyimpan file
-    """
-    # Combine X and y
-    df_final = X.copy()
-    df_final['quality'] = y.values
-    
-    # Save to CSV
-    df_final.to_csv(output_path, index=False)
-    
-    print(f"\n✓ Data berhasil disimpan:")
-    print(f"  Path: {output_path}")
-    print(f"  Shape: {df_final.shape}")
-
-
-def preprocess_pipeline(input_path, output_path, outlier_method='cap'):
-    """
-    Pipeline lengkap untuk preprocessing data
-    
-    Parameters:
-    -----------
-    input_path : str
-        Path ke file input CSV
-    output_path : str
-        Path untuk menyimpan file output CSV
-    outlier_method : str
-        Method untuk handle outliers ('cap' atau 'remove')
+        print("\n📈 Numerical Columns Statistics:")
+        print(self.df.describe())
         
-    Returns:
-    --------
-    dict
-        Dictionary berisi hasil preprocessing
-    """
-    print("=" * 60)
-    print("AUTOMATED WINE QUALITY DATA PREPROCESSING")
-    print("=" * 60)
+        print("\n📊 Categorical Columns:")
+        categorical_cols = self.df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            print(f"  {col}: {self.df[col].nunique()} unique values")
+        
+        print()
+        return self
     
-    # 1. Load data
-    df = load_data(input_path)
+    def handle_missing_values(self):
+        """Handle missing values in dataset"""
+        print("=" * 70)
+        print("STEP 3: HANDLING MISSING VALUES")
+        print("=" * 70)
+        
+        missing_before = self.df.isnull().sum().sum()
+        
+        if missing_before == 0:
+            print("✓ No missing values to handle")
+        else:
+            # Fill numerical columns with median
+            numerical_cols = self.df.select_dtypes(include=[np.number]).columns
+            for col in numerical_cols:
+                if self.df[col].isnull().sum() > 0:
+                    median_val = self.df[col].median()
+                    self.df[col].fillna(median_val, inplace=True)
+                    print(f"  ✓ Filled {col} with median: {median_val:.2f}")
+            
+            # Fill categorical columns with mode
+            categorical_cols = self.df.select_dtypes(include=['object']).columns
+            for col in categorical_cols:
+                if self.df[col].isnull().sum() > 0:
+                    mode_val = self.df[col].mode()[0]
+                    self.df[col].fillna(mode_val, inplace=True)
+                    print(f"  ✓ Filled {col} with mode: {mode_val}")
+        
+        missing_after = self.df.isnull().sum().sum()
+        print(f"\n✓ Missing values: {missing_before} → {missing_after}")
+        print()
+        
+        return self
     
-    # 2. Remove duplicates
-    df_clean = remove_duplicates(df)
+    def handle_outliers(self):
+        """Detect and handle outliers using IQR method"""
+        print("=" * 70)
+        print("STEP 4: HANDLING OUTLIERS")
+        print("=" * 70)
+        
+        numerical_cols = self.df.select_dtypes(include=[np.number]).columns
+        outliers_removed = 0
+        
+        for col in numerical_cols:
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            outliers = ((self.df[col] < lower_bound) | (self.df[col] > upper_bound)).sum()
+            
+            if outliers > 0:
+                # Cap outliers instead of removing
+                self.df[col] = self.df[col].clip(lower=lower_bound, upper=upper_bound)
+                outliers_removed += outliers
+                print(f"  ✓ {col}: {outliers} outliers capped")
+        
+        print(f"\n✓ Total outliers handled: {outliers_removed}")
+        print()
+        
+        return self
     
-    # 3. Handle outliers
-    df_no_outliers = handle_outliers(df_clean, method=outlier_method)
+    def feature_engineering(self):
+        """Create new features from existing ones"""
+        print("=" * 70)
+        print("STEP 5: FEATURE ENGINEERING")
+        print("=" * 70)
+        
+        # 1. Temperature categories
+        self.df['Temperature_Category'] = pd.cut(
+            self.df['Average_Temperature_C'],
+            bins=[-np.inf, 10, 20, 30, np.inf],
+            labels=['Cold', 'Moderate', 'Warm', 'Hot']
+        )
+        print("  ✓ Created Temperature_Category")
+        
+        # 2. Precipitation categories
+        self.df['Precipitation_Category'] = pd.cut(
+            self.df['Total_Precipitation_mm'],
+            bins=[-np.inf, 500, 1500, 2500, np.inf],
+            labels=['Low', 'Medium', 'High', 'Very_High']
+        )
+        print("  ✓ Created Precipitation_Category")
+        
+        # 3. Yield categories (for classification)
+        self.df['Yield_Category'] = pd.cut(
+            self.df['Crop_Yield_MT_per_HA'],
+            bins=[-np.inf, 1.5, 2.5, 3.5, np.inf],
+            labels=['Low', 'Medium', 'High', 'Very_High']
+        )
+        print("  ✓ Created Yield_Category")
+        
+        # 4. Climate stress indicator
+        self.df['Climate_Stress'] = (
+            (self.df['Average_Temperature_C'] > 30).astype(int) +
+            (self.df['Total_Precipitation_mm'] < 500).astype(int) +
+            (self.df['Extreme_Weather_Events'] > 5).astype(int)
+        )
+        print("  ✓ Created Climate_Stress indicator")
+        
+        # 5. Resource efficiency
+        self.df['Resource_Efficiency'] = (
+            self.df['Crop_Yield_MT_per_HA'] / 
+            (self.df['Fertilizer_Use_KG_per_HA'] + self.df['Pesticide_Use_KG_per_HA'] + 1)
+        )
+        print("  ✓ Created Resource_Efficiency")
+        
+        # 6. Environmental impact score
+        self.df['Environmental_Impact'] = (
+            self.df['CO2_Emissions_MT'] * 0.4 +
+            self.df['Pesticide_Use_KG_per_HA'] * 0.3 +
+            self.df['Fertilizer_Use_KG_per_HA'] * 0.3
+        )
+        print("  ✓ Created Environmental_Impact")
+        
+        print(f"\n✓ Total features after engineering: {len(self.df.columns)}")
+        print()
+        
+        return self
     
-    # 4. Feature engineering
-    df_processed = feature_engineering(df_no_outliers)
+    def encode_categorical(self):
+        """Encode categorical variables"""
+        print("=" * 70)
+        print("STEP 6: ENCODING CATEGORICAL VARIABLES")
+        print("=" * 70)
+        
+        categorical_cols = ['Country', 'Region', 'Crop_Type', 'Adaptation_Strategies',
+                           'Temperature_Category', 'Precipitation_Category', 'Yield_Category']
+        
+        for col in categorical_cols:
+            if col in self.df.columns:
+                le = LabelEncoder()
+                self.df[f'{col}_Encoded'] = le.fit_transform(self.df[col].astype(str))
+                self.label_encoders[col] = le
+                print(f"  ✓ Encoded {col} ({self.df[col].nunique()} categories)")
+        
+        print(f"\n✓ Total categorical columns encoded: {len(categorical_cols)}")
+        print()
+        
+        return self
     
-    # 5. Scale features
-    X_scaled, y, scaler = scale_features(df_processed)
+    def select_features(self):
+        """Select final features for modeling"""
+        print("=" * 70)
+        print("STEP 7: FEATURE SELECTION")
+        print("=" * 70)
+        
+        # Select numerical features
+        numerical_features = [
+            'Year',
+            'Average_Temperature_C',
+            'Total_Precipitation_mm',
+            'CO2_Emissions_MT',
+            'Extreme_Weather_Events',
+            'Irrigation_Access_%',
+            'Pesticide_Use_KG_per_HA',
+            'Fertilizer_Use_KG_per_HA',
+            'Soil_Health_Index',
+            'Climate_Stress',
+            'Resource_Efficiency',
+            'Environmental_Impact'
+        ]
+        
+        # Select encoded categorical features
+        encoded_features = [
+            'Country_Encoded',
+            'Region_Encoded',
+            'Crop_Type_Encoded',
+            'Adaptation_Strategies_Encoded',
+            'Temperature_Category_Encoded',
+            'Precipitation_Category_Encoded'
+        ]
+        
+        # Target variable
+        target = 'Crop_Yield_MT_per_HA'
+        
+        # Combine all features
+        selected_features = numerical_features + encoded_features + [target]
+        
+        # Create processed dataframe
+        self.df_processed = self.df[selected_features].copy()
+        
+        print(f"  ✓ Selected {len(numerical_features)} numerical features")
+        print(f"  ✓ Selected {len(encoded_features)} encoded features")
+        print(f"  ✓ Target variable: {target}")
+        print(f"\n✓ Total features in processed dataset: {len(selected_features)}")
+        print()
+        
+        return self
     
-    # 6. Split data
-    X_train, X_test, y_train, y_test = split_data(X_scaled, y)
+    def scale_features(self):
+        """Scale numerical features"""
+        print("=" * 70)
+        print("STEP 8: FEATURE SCALING")
+        print("=" * 70)
+        
+        # Features to scale (exclude target)
+        features_to_scale = self.df_processed.columns.drop('Crop_Yield_MT_per_HA')
+        
+        # Fit and transform
+        self.df_processed[features_to_scale] = self.scaler.fit_transform(
+            self.df_processed[features_to_scale]
+        )
+        
+        print(f"  ✓ Scaled {len(features_to_scale)} features using StandardScaler")
+        print(f"  ✓ Mean: ~0, Std: ~1")
+        print()
+        
+        return self
     
-    # 7. Save processed data
-    save_processed_data(X_scaled, y, output_path)
+    def save_processed_data(self, output_path):
+        """Save processed dataset"""
+        print("=" * 70)
+        print("STEP 9: SAVING PROCESSED DATA")
+        print("=" * 70)
+        
+        self.df_processed.to_csv(output_path, index=False)
+        
+        print(f"  ✓ Processed data saved to: {output_path}")
+        print(f"  ✓ Shape: {self.df_processed.shape}")
+        print(f"  ✓ File size: {self.df_processed.memory_usage(deep=True).sum() / 1024:.2f} KB")
+        print()
+        
+        return self
     
-    print("\n" + "=" * 60)
-    print("✓ PREPROCESSING SELESAI!")
-    print("=" * 60)
+    def get_summary(self):
+        """Print preprocessing summary"""
+        print("=" * 70)
+        print("PREPROCESSING SUMMARY")
+        print("=" * 70)
+        
+        print(f"\n📊 Original Dataset:")
+        print(f"  Rows: {len(self.df)}")
+        print(f"  Columns: {len(self.df.columns)}")
+        
+        print(f"\n📊 Processed Dataset:")
+        print(f"  Rows: {len(self.df_processed)}")
+        print(f"  Columns: {len(self.df_processed.columns)}")
+        
+        print(f"\n✅ Preprocessing Steps Completed:")
+        print(f"  1. ✓ Data Loading")
+        print(f"  2. ✓ Data Exploration")
+        print(f"  3. ✓ Missing Value Handling")
+        print(f"  4. ✓ Outlier Treatment")
+        print(f"  5. ✓ Feature Engineering (6 new features)")
+        print(f"  6. ✓ Categorical Encoding (7 columns)")
+        print(f"  7. ✓ Feature Selection")
+        print(f"  8. ✓ Feature Scaling")
+        print(f"  9. ✓ Data Saving")
+        
+        print(f"\n🎯 Ready for Model Training!")
+        print("=" * 70)
+        
+        return self
+
+
+def main():
+    """Main preprocessing pipeline"""
+    print("\n" + "=" * 70)
+    print("CLIMATE CHANGE AGRICULTURE - DATA PREPROCESSING")
+    print("=" * 70)
+    print("Author: Zidan Mubarak")
+    print("Target: Advanced (4 pts) - Kriteria 1")
+    print("=" * 70 + "\n")
     
-    return {
-        'X_train': X_train,
-        'X_test': X_test,
-        'y_train': y_train,
-        'y_test': y_test,
-        'scaler': scaler,
-        'processed_data': (X_scaled, y)
-    }
+    # File paths
+    input_file = "../climate_change_raw.csv"
+    output_file = "climate_change_preprocessing.csv"
+    
+    # Initialize preprocessor
+    preprocessor = ClimateAgriculturePreprocessor(input_file)
+    
+    # Run preprocessing pipeline
+    preprocessor.load_data() \
+                .explore_data() \
+                .handle_missing_values() \
+                .handle_outliers() \
+                .feature_engineering() \
+                .encode_categorical() \
+                .select_features() \
+                .scale_features() \
+                .save_processed_data(output_file) \
+                .get_summary()
+    
+    print("\n✅ Preprocessing completed successfully!")
+    print(f"📁 Output file: {output_file}\n")
 
 
 if __name__ == "__main__":
-    # Default paths
-    input_file = "../WineQT_raw/WineQT.csv"
-    output_file = "WineQT_preprocessing.csv"
-    
-    # Check if custom paths are provided via command line
-    if len(sys.argv) > 1:
-        input_file = sys.argv[1]
-    if len(sys.argv) > 2:
-        output_file = sys.argv[2]
-    
-    # Run preprocessing pipeline
-    results = preprocess_pipeline(
-        input_path=input_file,
-        output_path=output_file,
-        outlier_method='cap'
-    )
-    
-    print(f"\n📊 Data siap untuk training!")
-    print(f"   X_train shape: {results['X_train'].shape}")
-    print(f"   X_test shape: {results['X_test'].shape}")
+    main()
